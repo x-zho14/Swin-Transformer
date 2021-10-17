@@ -11,15 +11,25 @@ from timm.scheduler.step_lr import StepLRScheduler
 from timm.scheduler.scheduler import Scheduler
 
 
-def build_scheduler(config, optimizer, n_iter_per_epoch):
+def build_scheduler(config, optimizer1, optimizer2, n_iter_per_epoch):
     num_steps = int(config.TRAIN.EPOCHS * n_iter_per_epoch)
     warmup_steps = int(config.TRAIN.WARMUP_EPOCHS * n_iter_per_epoch)
     decay_steps = int(config.TRAIN.LR_SCHEDULER.DECAY_EPOCHS * n_iter_per_epoch)
 
-    lr_scheduler = None
+    lr_scheduler1, lr_scheduler2 = None, None
     if config.TRAIN.LR_SCHEDULER.NAME == 'cosine':
-        lr_scheduler = CosineLRScheduler(
-            optimizer,
+        lr_scheduler1 = CosineLRScheduler(
+            optimizer1,
+            t_initial=num_steps,
+            t_mul=1.,
+            lr_min=config.TRAIN.MIN_LR,
+            warmup_lr_init=config.TRAIN.WARMUP_LR,
+            warmup_t=warmup_steps,
+            cycle_limit=1,
+            t_in_epochs=False,
+        )
+        lr_scheduler2 = CosineLRScheduler(
+            optimizer2,
             t_initial=num_steps,
             t_mul=1.,
             lr_min=config.TRAIN.MIN_LR,
@@ -29,8 +39,16 @@ def build_scheduler(config, optimizer, n_iter_per_epoch):
             t_in_epochs=False,
         )
     elif config.TRAIN.LR_SCHEDULER.NAME == 'linear':
-        lr_scheduler = LinearLRScheduler(
-            optimizer,
+        lr_scheduler1 = LinearLRScheduler(
+            optimizer1,
+            t_initial=num_steps,
+            lr_min_rate=0.01,
+            warmup_lr_init=config.TRAIN.WARMUP_LR,
+            warmup_t=warmup_steps,
+            t_in_epochs=False,
+        )
+        lr_scheduler2 = LinearLRScheduler(
+            optimizer2,
             t_initial=num_steps,
             lr_min_rate=0.01,
             warmup_lr_init=config.TRAIN.WARMUP_LR,
@@ -38,8 +56,16 @@ def build_scheduler(config, optimizer, n_iter_per_epoch):
             t_in_epochs=False,
         )
     elif config.TRAIN.LR_SCHEDULER.NAME == 'step':
-        lr_scheduler = StepLRScheduler(
-            optimizer,
+        lr_scheduler1 = StepLRScheduler(
+            optimizer1,
+            decay_t=decay_steps,
+            decay_rate=config.TRAIN.LR_SCHEDULER.DECAY_RATE,
+            warmup_lr_init=config.TRAIN.WARMUP_LR,
+            warmup_t=warmup_steps,
+            t_in_epochs=False,
+        )
+        lr_scheduler2 = StepLRScheduler(
+            optimizer2,
             decay_t=decay_steps,
             decay_rate=config.TRAIN.LR_SCHEDULER.DECAY_RATE,
             warmup_lr_init=config.TRAIN.WARMUP_LR,
@@ -47,7 +73,7 @@ def build_scheduler(config, optimizer, n_iter_per_epoch):
             t_in_epochs=False,
         )
 
-    return lr_scheduler
+    return lr_scheduler1, lr_scheduler2
 
 
 class LinearLRScheduler(Scheduler):

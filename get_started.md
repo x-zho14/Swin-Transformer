@@ -53,7 +53,7 @@ conda install pytorch==1.7.1 torchvision==0.8.2 cudatoolkit=10.1 -c pytorch
 - Install `timm==0.3.2`:
 
 ```bash
-pip install timm==0.3.2
+pip install timm==0.3.2 yacs termcolor``
 ```
 
 - Install `Apex`:
@@ -174,8 +174,8 @@ For example, to train `Swin Transformer` with 8 GPU on a single node for 300 epo
 `Swin-T`:
 
 ```bash
-python -m torch.distributed.launch --nproc_per_node 8 --master_port 12345  main.py \
---cfg configs/swin_tiny_patch4_window7_224.yaml --data-path <imagenet-path> --batch-size 128 
+conda activate /home/honglanqing/anaconda3/envs/yanshp_clip && cd /home/honglanqing/zx/Swin-Transformer && python -m torch.distributed.launch --nproc_per_node 8 --master_port 12345  main.py --cfg configs/swin_tiny_patch4_window7_224.yaml --data-path /home/honglanqing/alexzhou/data/imagenet_ilsvrc/ILSVRC/Data/CLS-LOC/ --batch-size 4
+
 ```
 
 `Swin-S`:
@@ -192,6 +192,8 @@ python -m torch.distributed.launch --nproc_per_node 8 --master_port 12345  main.
 --cfg configs/swin_base_patch4_window7_224.yaml --data-path <imagenet-path> --batch-size 64 \
 --accumulation-steps 2 [--use-checkpoint]
 ```
+conda activate /home/honglanqing/anaconda3/envs/yanshp_clip && cd /home/honglanqing/zx/Swin-Transformer && CUDA_VISIBLE_DEVICES=6 python -m torch.distributed.launch --nproc_per_node 1 --master_port 12345 main.py     --cfg configs/swin_tiny_patch4_window7_224.yaml --batch-size 128 --output output/CIFAR10 --opts SAVE_FREQ 10 PRINT_FREQ 1 TRAIN.EPOCHS 100 DATA.DATASET cifar10 --prune-rate 0.5 --score-init-constant 0.5 --K 2
+
 
 ### Throughput
 

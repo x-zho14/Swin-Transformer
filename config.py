@@ -8,6 +8,7 @@
 import os
 import yaml
 from yacs.config import CfgNode as CN
+import argparse
 
 _C = CN()
 
@@ -97,7 +98,7 @@ _C.TRAIN.MIN_LR = 5e-6
 # Clip gradient norm
 _C.TRAIN.CLIP_GRAD = 5.0
 # Auto resume from latest checkpoint
-_C.TRAIN.AUTO_RESUME = True
+_C.TRAIN.AUTO_RESUME = False
 # Gradient accumulation steps
 # could be overwritten by command line argument
 _C.TRAIN.ACCUMULATION_STEPS = 0
@@ -180,9 +181,10 @@ _C.THROUGHPUT_MODE = False
 # local rank for DistributedDataParallel, given by command line argument
 _C.LOCAL_RANK = 0
 
-
+_C.scale_fan = False
+_C.mode = "fan_in"
+_C.nonlinearity = "relu"
 def _update_config_from_file(config, cfg_file):
-    config.defrost()
     with open(cfg_file, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -193,13 +195,11 @@ def _update_config_from_file(config, cfg_file):
             )
     print('=> merge config from {}'.format(cfg_file))
     config.merge_from_file(cfg_file)
-    config.freeze()
 
 
 def update_config(config, args):
     _update_config_from_file(config, args.cfg)
 
-    config.defrost()
     if args.opts:
         config.merge_from_list(args.opts)
 
@@ -228,6 +228,18 @@ def update_config(config, args):
         config.EVAL_MODE = True
     if args.throughput:
         config.THROUGHPUT_MODE = True
+    if args.conv_type:
+        config.conv_type = args.conv_type
+    if args.K:
+        config.K = args.K
+    if args.prune_rate:
+        config.prune_rate = args.prune_rate
+    if args.score_init_constant:
+        config.score_init_constant = args.score_init_constant
+    if args.init:
+        config.init = args.init
+    if args.scale_fan:
+        config.scale_fan = args.scale_fan
 
     # set local rank for distributed training
     config.LOCAL_RANK = args.local_rank
@@ -235,7 +247,6 @@ def update_config(config, args):
     # output folder
     config.OUTPUT = os.path.join(config.OUTPUT, config.MODEL.NAME, config.TAG)
 
-    config.freeze()
 
 
 def get_config(args):
@@ -246,3 +257,51 @@ def get_config(args):
     update_config(config, args)
 
     return config
+
+def parse_option():
+    parser = argparse.ArgumentParser('Swin Transformer training and evaluation script', add_help=False)
+    parser.add_argument('--cfg', type=str, required=True, metavar="FILE", help='path to config file', )
+    parser.add_argument(
+        "--opts",
+        help="Modify config options by adding 'KEY VALUE' pairs. ",
+        default=None,
+        nargs='+',
+    )
+
+    # easy config modification
+    parser.add_argument('--batch-size', type=int, help="batch size for single GPU")
+    parser.add_argument('--data-path', type=str, help='path to dataset')
+    parser.add_argument('--zip', action='store_true', help='use zipped dataset instead of folder dataset')
+    parser.add_argument('--cache-mode', type=str, default='part', choices=['no', 'full', 'part'],
+                        help='no: no cache, '
+                             'full: cache all data, '
+                             'part: sharding the dataset into nonoverlapping pieces and only cache one piece')
+    parser.add_argument('--resume', help='resume from checkpoint')
+    parser.add_argument('--accumulation-steps', type=int, help="gradient accumulation steps")
+    parser.add_argument('--use-checkpoint', action='store_true',
+                        help="whether to use gradient checkpointing to save memory")
+    parser.add_argument('--amp-opt-level', type=str, default='O1', choices=['O0', 'O1', 'O2'],
+                        help='mixed precision opt level, if O0, no amp is used')
+    parser.add_argument('--output', default='output', type=str, metavar='PATH',
+                        help='root of output folder, the full path is <output>/<model_name>/<tag> (default: output)')
+    parser.add_argument('--tag', help='tag of experiment')
+    parser.add_argument('--eval', action='store_true', help='Perform evaluation only')
+    parser.add_argument('--throughput', action='store_true', help='Test throughput only')
+    parser.add_argument('--conv_type', type=str, default='ReinforceLOOVR', help='')
+    parser.add_argument('--K', type=int, help="sample size")
+    parser.add_argument('--prune-rate', type=float, help="")
+    parser.add_argument('--score-init-constant', type=float, help="")
+    parser.add_argument('--threetimes', action='store_true', help='3x')
+    parser.add_argument('--init', type=str, default='kaiming_normal', help='')
+    parser.add_argument('--scale_fan', action='store_true', help='')
+
+    # distributed training
+    parser.add_argument("--local_rank", type=int, required=True, help='local rank for DistributedDataParallel')
+
+    args, unparsed = parser.parse_known_args()
+
+    config = get_config(args)
+
+    return args, config
+
+_, config = parse_option()

@@ -12,37 +12,56 @@ def build_optimizer(config, model):
     """
     Build optimizer, set weight decay of normalization to 0 by default.
     """
+
+    parameters = list(model.named_parameters())
+    for n, v in parameters:
+        if ("score" not in n) and v.requires_grad:
+            print(n, "weight_para")
+    for n, v in parameters:
+        if ("score" in n) and v.requires_grad:
+            print(n, "score_para")
+    weight_params = [v for n, v in parameters if ("score" not in n) and v.requires_grad]
+    score_params = [v for n, v in parameters if ("score" in n) and v.requires_grad]
+
     skip = {}
     skip_keywords = {}
     if hasattr(model, 'no_weight_decay'):
         skip = model.no_weight_decay()
     if hasattr(model, 'no_weight_decay_keywords'):
         skip_keywords = model.no_weight_decay_keywords()
-    parameters = set_weight_decay(model, skip, skip_keywords)
-
+    weight_params = set_weight_decay([(n, v) for n, v in parameters if ("score" not in n) and v.requires_grad], skip, skip_keywords)
     opt_lower = config.TRAIN.OPTIMIZER.NAME.lower()
-    optimizer = None
+    optimizer, score_optimizer = None, None
     if opt_lower == 'sgd':
-        optimizer = optim.SGD(parameters, momentum=config.TRAIN.OPTIMIZER.MOMENTUM, nesterov=True,
+        optimizer = optim.SGD(weight_params, momentum=config.TRAIN.OPTIMIZER.MOMENTUM, nesterov=True,
                               lr=config.TRAIN.BASE_LR, weight_decay=config.TRAIN.WEIGHT_DECAY)
+        score_optimizer = optim.Adam(score_params, lr=12e-3, weight_decay=0)
     elif opt_lower == 'adamw':
-        optimizer = optim.AdamW(parameters, eps=config.TRAIN.OPTIMIZER.EPS, betas=config.TRAIN.OPTIMIZER.BETAS,
+        optimizer = optim.AdamW(weight_params, eps=config.TRAIN.OPTIMIZER.EPS, betas=config.TRAIN.OPTIMIZER.BETAS,
                                 lr=config.TRAIN.BASE_LR, weight_decay=config.TRAIN.WEIGHT_DECAY)
+        score_optimizer = optim.Adam(score_params, lr=12e-3, weight_decay=0)
+    return optimizer, score_optimizer
 
-    return optimizer
 
-
-def set_weight_decay(model, skip_list=(), skip_keywords=()):
+def set_weight_decay(weight_params, skip_list=(), skip_keywords=()):
     has_decay = []
     no_decay = []
 
-    for name, param in model.named_parameters():
+    for name, param in weight_params:
         if not param.requires_grad:
             continue  # frozen weights
         if len(param.shape) == 1 or name.endswith(".bias") or (name in skip_list) or \
                 check_keywords_in_name(name, skip_keywords):
             no_decay.append(param)
             # print(f"{name} has no weight decay")
+            # if len(param.shape) == 1:
+            #     print("1")
+            # elif name.endswith(".bias"):
+            #     print("2")
+            # elif (name in skip_list):
+            #     print("3")
+            # elif check_keywords_in_name(name, skip_keywords):
+            #     print("4")
         else:
             has_decay.append(param)
     return [{'params': has_decay},
