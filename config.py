@@ -184,6 +184,7 @@ _C.LOCAL_RANK = 0
 _C.scale_fan = False
 _C.mode = "fan_in"
 _C.nonlinearity = "relu"
+_C.bn_type = "LearnedBatchNorm"
 def _update_config_from_file(config, cfg_file):
     with open(cfg_file, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.FullLoader)
