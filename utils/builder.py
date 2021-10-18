@@ -1,23 +1,51 @@
-from config import config as args
+from args import args
 import math
 
 import torch
 import torch.nn as nn
 
-import utils.bn_type
 import utils.conv_type
+import utils.bn_type
+
 
 class Builder(object):
-    def __init__(self, conv_layer, ):
+    def __init__(self, conv_layer, bn_layer, first_layer=None):
         self.conv_layer = conv_layer
+        self.bn_layer = bn_layer
+        self.first_layer = first_layer or conv_layer
 
-    def conv_custom(self, in_chans, embed_dim, kernel_size, stride):
-        c = self.conv_layer(in_chans, embed_dim, kernel_size=kernel_size, stride=stride, bias=False)
-        self._init_conv(c)
-        return c
+    def conv_custom(self, in_planes, out_planes, kernel_size, stride, first_layer=False):
+        conv_layer = self.first_layer if first_layer else self.conv_layer
+        if first_layer:
+            print(f"==> Building first layer with {str(self.first_layer)}")
+        conv = conv_layer(
+                in_planes,
+                out_planes,
+                kernel_size=kernel_size,
+                stride=stride,
+                bias=False,
+            )
+        self._init_conv(conv)
+        return conv
 
-    def conv(self, kernel_size, in_planes, out_planes, stride=1):
-        conv_layer = self.conv_layer
+    def linear(self, in_planes, out_planes, first_layer=False):
+        conv_layer = self.first_layer if first_layer else self.conv_layer
+        if first_layer:
+            print(f"==> Building first layer with {str(self.first_layer)}")
+        conv = conv_layer(
+            in_planes,
+            out_planes,
+            bias=True,
+        )
+        self._init_conv(conv)
+        return conv
+
+    def conv(self, kernel_size, in_planes, out_planes, stride=1, first_layer=False):
+        conv_layer = self.first_layer if first_layer else self.conv_layer
+
+        if first_layer:
+            print(f"==> Building first layer with {str(self.first_layer)}")
+
         if kernel_size == 3:
             conv = conv_layer(
                 in_planes,
@@ -53,27 +81,32 @@ class Builder(object):
             return None
 
         self._init_conv(conv)
+
         return conv
 
-    def conv3x3(self, in_planes, out_planes, stride=1):
+    def conv3x3(self, in_planes, out_planes, stride=1, first_layer=False):
         """3x3 convolution with padding"""
-        c = self.conv(3, in_planes, out_planes, stride=stride)
+        print(self.conv_layer)
+        c = self.conv(3, in_planes, out_planes, stride=stride, first_layer=first_layer)
         return c
 
-    def conv1x1(self, in_planes, out_planes, stride=1):
+    def conv1x1(self, in_planes, out_planes, stride=1, first_layer=False):
         """1x1 convolution with padding"""
-        c = self.conv(1, in_planes, out_planes, stride=stride)
+        c = self.conv(1, in_planes, out_planes, stride=stride, first_layer=first_layer)
         return c
 
-    def conv7x7(self, in_planes, out_planes, stride=1):
+    def conv7x7(self, in_planes, out_planes, stride=1, first_layer=False):
         """7x7 convolution with padding"""
-        c = self.conv(7, in_planes, out_planes, stride=stride)
+        c = self.conv(7, in_planes, out_planes, stride=stride, first_layer=first_layer)
         return c
 
-    def conv5x5(self, in_planes, out_planes, stride=1):
+    def conv5x5(self, in_planes, out_planes, stride=1, first_layer=False):
         """5x5 convolution with padding"""
-        c = self.conv(5, in_planes, out_planes, stride=stride)
+        c = self.conv(5, in_planes, out_planes, stride=stride, first_layer=first_layer)
         return c
+
+    def batchnorm(self, planes, last_bn=False, first_layer=False):
+        return self.bn_layer(planes)
 
     def activation(self):
         if args.nonlinearity == "relu":
@@ -111,6 +144,7 @@ class Builder(object):
                 with torch.no_grad():
                     conv.weight.data.normal_(0, std)
             else:
+                print("init by 1")
                 nn.init.kaiming_normal_(
                     conv.weight, mode=args.mode, nonlinearity=args.nonlinearity
                 )
@@ -136,7 +170,20 @@ class Builder(object):
 
 
 def get_builder():
+    print("Here!!!!!!!!")
     print("==> Conv Type: {}".format(args.conv_type))
+    print("==> BN Type: {}".format(args.bn_type))
+
     conv_layer = getattr(utils.conv_type, args.conv_type)
-    builder = Builder(conv_layer=conv_layer)
+    bn_layer = getattr(utils.bn_type, args.bn_type)
+    print(conv_layer)
+    print(bn_layer)
+    if args.first_layer_type is not None:
+        first_layer = getattr(utils.conv_type, args.first_layer_type)
+        print(f"==> First Layer Type: {args.first_layer_type}")
+    else:
+        first_layer = None
+
+    builder = Builder(conv_layer=conv_layer, bn_layer=bn_layer, first_layer=first_layer)
+
     return builder
