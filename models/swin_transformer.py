@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.utils.checkpoint as checkpoint
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-from .builder import get_builder
+from utils.builder import get_builder
 
 class Mlp(nn.Module):
     def __init__(self, builder, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
