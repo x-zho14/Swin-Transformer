@@ -1,4 +1,4 @@
-from args import args
+from config import config as args
 import math
 
 import torch
