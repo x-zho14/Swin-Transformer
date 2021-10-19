@@ -47,8 +47,8 @@ def main(config):
     weight_opt, score_opt = build_optimizer(config, model)
     if config.AMP_OPT_LEVEL != "O0":
         model, opt_l = amp.initialize(model, [weight_opt, score_opt], opt_level=config.AMP_OPT_LEVEL)
-    weight_opt = opt_l[0]
-    score_opt = opt_l[1]
+        weight_opt = opt_l[0]
+        score_opt = opt_l[1]
     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[config.LOCAL_RANK], broadcast_buffers=False)
     model_without_ddp = model.module
 
