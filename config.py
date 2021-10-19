@@ -289,7 +289,7 @@ def parse_option():
     parser.add_argument('--tag', help='tag of experiment')
     parser.add_argument('--eval', action='store_true', help='Perform evaluation only')
     parser.add_argument('--throughput', action='store_true', help='Test throughput only')
-    parser.add_argument('--conv_type', type=str, default='ReinforceLOOVR', help='')
+    parser.add_argument('--conv_type', type=str, default='ReinforceLOOVRLinear', help='')
     parser.add_argument('--K', type=int, help="sample size")
     parser.add_argument('--prune-rate', type=float, help="")
     parser.add_argument('--score-init-constant', type=float, help="")
