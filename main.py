@@ -187,6 +187,7 @@ def train_one_epoch(config, model, criterion, data_loader, weight_opt, score_opt
             loss = original_loss/config.K
             fn_list.append(loss.item()*config.K)
             perform_backward(loss, weight_opt, score_opt)
+            print(outputs.size(), targets.size())
             acc1, acc5 = accuracy(outputs, targets, topk=(1, 5))
             l = l + loss.item()
             ol = ol + original_loss.item() / config.K
