@@ -16,7 +16,7 @@ import torch.backends.cudnn as cudnn
 import torch.distributed as dist
 
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
-from timm.utils import AverageMeter
+from timm.utils import accuracy, AverageMeter
 
 from config import get_config
 from models import build_model
@@ -157,23 +157,6 @@ def calculateGrad_pge(model, fn_list, args):
             m.scores.grad.data += 1/args.K*(fn_list[0]*getattr(m, 'stored_mask_0')) + 1/args.K*(fn_list[1]*getattr(m, 'stored_mask_1'))
 
 
-def accuracy(output, target, topk=(1,)):
-    """Computes the accuracy over the k top predictions for the specified values of k"""
-    with torch.no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
-
-        _, pred = output.topk(maxk, 1, True, True)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-        res = []
-        for k in topk:
-            correct_k = correct[:k].flatten().float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-        return res
-
-
 def train_one_epoch(config, model, criterion, data_loader, weight_opt, score_opt, epoch, mixup_fn, lr_scheduler1, lr_scheduler2):
     model.train()
     num_steps = len(data_loader)
@@ -190,6 +173,7 @@ def train_one_epoch(config, model, criterion, data_loader, weight_opt, score_opt
     for idx, (samples, targets) in enumerate(data_loader):
         samples = samples.cuda(non_blocking=True)
         targets = targets.cuda(non_blocking=True)
+        original_targets = targets.clone()
         l, ol, gl, al, a1, a5, ll = 0, 0, 0, 0, 0, 0, 0
 
         weight_opt.zero_grad()
@@ -205,8 +189,7 @@ def train_one_epoch(config, model, criterion, data_loader, weight_opt, score_opt
             loss = original_loss/config.K
             fn_list.append(loss.item()*config.K)
             perform_backward(loss, weight_opt, score_opt)
-            print("outputs, targets,", outputs.size(), targets.size())
-            acc1, acc5 = accuracy(outputs, targets, topk=(1, 5))
+            acc1, acc5 = accuracy(outputs, original_targets, topk=(1, 5))
             l = l + loss.item()
             ol = ol + original_loss.item() / config.K
             a1 = a1 + acc1.item() / config.K
