@@ -16,7 +16,7 @@ import torch.backends.cudnn as cudnn
 import torch.distributed as dist
 
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
-from timm.utils import accuracy, AverageMeter
+from timm.utils import AverageMeter
 
 from config import get_config
 from models import build_model
@@ -155,6 +155,24 @@ def calculateGrad_pge(model, fn_list, args):
     for n, m in model.named_modules():
         if hasattr(m, "scores") and m.prune:
             m.scores.grad.data += 1/args.K*(fn_list[0]*getattr(m, 'stored_mask_0')) + 1/args.K*(fn_list[1]*getattr(m, 'stored_mask_1'))
+
+
+def accuracy(output, target, topk=(1,)):
+    """Computes the accuracy over the k top predictions for the specified values of k"""
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
+
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+        res = []
+        for k in topk:
+            correct_k = correct[:k].flatten().float().sum(0, keepdim=True)
+            res.append(correct_k.mul_(100.0 / batch_size))
+        return res
+
 
 def train_one_epoch(config, model, criterion, data_loader, weight_opt, score_opt, epoch, mixup_fn, lr_scheduler1, lr_scheduler2):
     model.train()
