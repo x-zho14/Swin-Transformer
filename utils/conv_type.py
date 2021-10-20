@@ -6,6 +6,8 @@ import torch.nn.functional as F
 import math
 from config import config as parser_args
 
+DenseLinear = nn.Linear
+
 class ReinforceLOOVRLinear(nn.Linear):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
