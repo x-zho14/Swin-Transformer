@@ -49,7 +49,7 @@ def main(config):
         model, opt_l = amp.initialize(model, [weight_opt, score_opt], opt_level=config.AMP_OPT_LEVEL)
         weight_opt = opt_l[0]
         score_opt = opt_l[1]
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[config.LOCAL_RANK], broadcast_buffers=False)
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[config.LOCAL_RANK], broadcast_buffers=False, find_unused_parameters=True)
     model_without_ddp = model.module
 
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
