@@ -148,8 +148,8 @@ def main(config):
         config.use_running_stats = True
         for epoch in range(0, 40):
             data_loader_train.sampler.set_epoch(epoch)
-            train_one_epoch(config, model, criterion, data_loader_train, weight_opt, score_opt, epoch, mixup_fn,
-                            lr_scheduler1, lr_scheduler2)
+            train_one_epoch(config, model, criterion, data_loader_train, finetune_optimizer, None, epoch, mixup_fn,
+                            None, None)
             acc1, acc5, loss = validate(config, data_loader_val, model)
             logger.info(f"Accuracy of the network on the {len(dataset_val)} test images: {acc1:.1f}%")
             max_accuracy = max(max_accuracy, acc1)
@@ -221,9 +221,10 @@ def train_one_epoch(config, model, criterion, data_loader, weight_opt, score_opt
         targets = targets.cuda(non_blocking=True)
         original_targets = targets.clone()
         l, ol, gl, al, a1, a5, ll = 0, 0, 0, 0, 0, 0, 0
-
-        weight_opt.zero_grad()
-        score_opt.zero_grad()
+        if weight_opt is not None:
+            weight_opt.zero_grad()
+        if score_opt is not None:
+            score_opt.zero_grad()
 
         if mixup_fn is not None:
             samples, targets = mixup_fn(samples, targets)
@@ -248,12 +249,15 @@ def train_one_epoch(config, model, criterion, data_loader, weight_opt, score_opt
             if config.conv_type == "Reinforce":
                 calculateGrad_pge(model, fn_list, config)
 
-
         grad_norm = get_grad_norm(model, weight_opt, score_opt)
-        weight_opt.step()
-        score_opt.step()
-        lr_scheduler1.step_update(epoch * num_steps + idx)
-        lr_scheduler2.step_update(epoch * num_steps + idx)
+        if weight_opt is not None:
+            weight_opt.step()
+        if score_opt is not None:
+            score_opt.step()
+        if lr_scheduler1 is not None:
+            lr_scheduler1.step_update(epoch * num_steps + idx)
+        if lr_scheduler2 is not None:
+            lr_scheduler2.step_update(epoch * num_steps + idx)
 
         torch.cuda.synchronize()
 
@@ -268,8 +272,8 @@ def train_one_epoch(config, model, criterion, data_loader, weight_opt, score_opt
                 with torch.no_grad():
                     constrainScoreByWhole(model, v_meter, max_score_meter)
         if idx % config.PRINT_FREQ == 0:
-            lr1 = weight_opt.param_groups[0]['lr']
-            lr2 = score_opt.param_groups[0]['lr']
+            lr1 = weight_opt.param_groups[0]['lr'] if weight_opt is not None else 0
+            lr2 = score_opt.param_groups[0]['lr'] if score_opt is not None else 0
             etas = batch_time.avg * (num_steps - idx)
             logger.info(
                 f'Train: [{epoch}/{config.TRAIN.EPOCHS}][{idx}/{num_steps}]\t'
