@@ -257,7 +257,7 @@ def train_one_epoch(config, model, criterion, data_loader, weight_opt, score_opt
 
         torch.cuda.synchronize()
 
-        loss_meter.update(l.item(), targets.size(0))
+        loss_meter.update(l, targets.size(0))
         norm_meter.update(grad_norm)
         batch_time.update(time.time() - end)
         top1.update(a1, targets.size(0))
