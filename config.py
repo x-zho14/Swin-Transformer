@@ -187,6 +187,8 @@ _C.nonlinearity = "relu"
 _C.bn_type = "LearnedBatchNorm"
 _C.first_layer_type = None
 _C.train_weights_at_the_same_time = False
+_C.use_running_stats = False
+_c.sample_from_training_set = False
 def _update_config_from_file(config, cfg_file):
     with open(cfg_file, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.FullLoader)
@@ -247,6 +249,10 @@ def update_config(config, args):
         config.DATA.DATASET = args.dataset
     if args.train_weights_at_the_same_time:
         config.train_weights_at_the_same_time = args.train_weights_at_the_same_time
+    if args.use_running_stats:
+        config.use_running_stats = args.use_running_stats
+    if args.sample_from_training_set:
+        config.sample_from_training_set = args.sample_from_training_set
 
     # set local rank for distributed training
     config.LOCAL_RANK = args.local_rank
@@ -303,6 +309,8 @@ def parse_option():
     parser.add_argument('--scale_fan', action='store_true', help='')
     parser.add_argument('--dataset', type=str, default='cifar10', help='')
     parser.add_argument('--train_weights_at_the_same_time', action='store_true', help='')
+    parser.add_argument('--use_running_stats', action='store_true', help='')
+    parser.add_argument('--sample_from_training_set', action='store_true', help='')
 
 
     # distributed training

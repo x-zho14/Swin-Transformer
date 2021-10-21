@@ -95,7 +95,7 @@ def main(config):
     start_time = time.time()
     flops_reduction_list = []
     config.finetuning = False
-    config.use_running_stats = False
+
     for epoch in range(config.TRAIN.START_EPOCH, config.TRAIN.EPOCHS):
         data_loader_train.sampler.set_epoch(epoch)
         train_one_epoch(config, model, criterion, data_loader_train, weight_opt, score_opt, epoch, mixup_fn, lr_scheduler1, lr_scheduler2)
