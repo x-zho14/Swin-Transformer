@@ -37,7 +37,6 @@ except ImportError:
 
 def main(config):
     config.defrost()
-    config.finetuning = False
     dataset_train, dataset_val, data_loader_train, data_loader_val, mixup_fn = build_loader(config)
 
     logger.info(f"Creating model:{config.MODEL.TYPE}/{config.MODEL.NAME}")
@@ -45,7 +44,7 @@ def main(config):
     model.cuda()
     logger.info(str(model))
 
-    weight_opt, score_opt = build_optimizer(config, model)
+    weight_opt, score_opt, weight_params = build_optimizer(config, model)
     if config.AMP_OPT_LEVEL != "O0":
         model, opt_l = amp.initialize(model, [weight_opt, score_opt], opt_level=config.AMP_OPT_LEVEL)
         weight_opt = opt_l[0]
@@ -95,6 +94,7 @@ def main(config):
     logger.info("Start training")
     start_time = time.time()
     flops_reduction_list = []
+    config.finetuning = False
     config.use_running_stats = False
     for epoch in range(config.TRAIN.START_EPOCH, config.TRAIN.EPOCHS):
         data_loader_train.sampler.set_epoch(epoch)
@@ -117,36 +117,15 @@ def main(config):
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     logger.info('Training time {}'.format(total_time_str))
 
-    config.use_running_stats = True
-    for epoch in range(0, 40):
-        data_loader_train.sampler.set_epoch(epoch)
-        train_one_epoch(config, model, criterion, data_loader_train, weight_opt, score_opt, epoch, mixup_fn, lr_scheduler1, lr_scheduler2)
-        if dist.get_rank() == 0 and (epoch % config.SAVE_FREQ == 0 or epoch == (config.TRAIN.EPOCHS - 1)):
-            save_checkpoint(config, epoch, model_without_ddp, max_accuracy, weight_opt, score_opt, lr_scheduler1, lr_scheduler2, logger)
-        if epoch % 1 == 0 and "Dense" not in config.conv_type:
-            print("=> compute model params and flops")
-            c = 3
-            input_res = 224
-            flops_reduction = print_model_param_flops_sparse(model, c=c, input_res=input_res, multiply_adds=False)
-            flops_reduction_list.append(flops_reduction.item())
-            print("avg train cost/ savings", sum(flops_reduction_list)/len(flops_reduction_list), 3/(4*sum(flops_reduction_list)/len(flops_reduction_list)))
-            torch.cuda.empty_cache()
-        acc1, acc5, loss = validate(config, data_loader_val, model)
-        logger.info(f"Accuracy of the network on the {len(dataset_val)} test images: {acc1:.1f}%")
-        max_accuracy = max(max_accuracy, acc1)
-        logger.info(f'Max accuracy: {max_accuracy:.2f}%')
-
     if config.finetune:
-        config.K = 1
         print("continue finetune")
+        config.K = 1
+        best_acc1 = 0
+        config.finetuning = True
         freeze_model_subnet(model)
         fix_model_subnet(model)
-        finetune_optimizer = torch.optim.SGD(
-            filter(lambda p: p.requires_grad, model.parameters()),
-            lr=0.001,
-            momentum=config.solver.momentum,
-            weight_decay=config.solver.weight_decay,
-        )
+        finetune_optimizer = torch.optim.AdamW(weight_params, eps=config.TRAIN.OPTIMIZER.EPS, betas=config.TRAIN.OPTIMIZER.BETAS,
+                    lr=config.TRAIN.BASE_LR*1e-2, weight_decay=config.TRAIN.WEIGHT_DECAY)
         if config.sample_from_training_set:
             config.use_running_stats = False
             i = 0

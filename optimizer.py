@@ -40,7 +40,7 @@ def build_optimizer(config, model):
         optimizer = optim.AdamW(weight_params, eps=config.TRAIN.OPTIMIZER.EPS, betas=config.TRAIN.OPTIMIZER.BETAS,
                                 lr=config.TRAIN.BASE_LR, weight_decay=config.TRAIN.WEIGHT_DECAY)
         score_optimizer = optim.Adam(score_params, lr=12e-3, weight_decay=0)
-    return optimizer, score_optimizer
+    return optimizer, score_optimizer, weight_params
 
 
 def set_weight_decay(weight_params, skip_list=(), skip_keywords=()):
