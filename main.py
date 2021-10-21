@@ -27,7 +27,7 @@ from logger import create_logger
 from utils.storage import load_checkpoint, save_checkpoint, get_grad_norm, auto_resume_helper, reduce_tensor
 from config import config
 from utils.net_utils import constrainScoreByWhole, freeze_model_subnet, freeze_model_weights
-from utils.compute_flops import print_model_param_flops_sparse
+from utils.compute_flops import print_model_param_flops_sparse, print_model_param_flops
 import copy
 try:
     # noinspection PyUnresolvedReferences
@@ -101,11 +101,11 @@ def main(config):
         train_one_epoch(config, model, criterion, data_loader_train, weight_opt, score_opt, epoch, mixup_fn, lr_scheduler1, lr_scheduler2)
         if dist.get_rank() == 0 and (epoch % config.SAVE_FREQ == 0 or epoch == (config.TRAIN.EPOCHS - 1)):
             save_checkpoint(config, epoch, model_without_ddp, max_accuracy, weight_opt, score_opt, lr_scheduler1, lr_scheduler2, logger)
+        if epoch % 1 == 0 and "Dense" in config.conv_type:
+            print_model_param_flops(model, c=3, input_res=224, multiply_adds=False)
         if epoch % 1 == 0 and "Dense" not in config.conv_type:
             print("=> compute model params and flops")
-            c = 3
-            input_res = 224
-            flops_reduction = print_model_param_flops_sparse(model, c=c, input_res=input_res, multiply_adds=False)
+            flops_reduction = print_model_param_flops_sparse(model, c=3, input_res=224, multiply_adds=False)
             flops_reduction_list.append(flops_reduction.item())
             print("avg train cost/ savings", sum(flops_reduction_list)/len(flops_reduction_list), 3/(4*sum(flops_reduction_list)/len(flops_reduction_list)))
             torch.cuda.empty_cache()
