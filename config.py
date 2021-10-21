@@ -244,6 +244,8 @@ def update_config(config, args):
         config.scale_fan = args.scale_fan
     if args.dataset:
         config.DATA.DATASET = args.dataset
+    if args.train_weights_at_the_same_time:
+        config.train_weights_at_the_same_time = args.train_weights_at_the_same_time
 
     # set local rank for distributed training
     config.LOCAL_RANK = args.local_rank
@@ -299,6 +301,8 @@ def parse_option():
     parser.add_argument('--init', type=str, default='kaiming_normal', help='')
     parser.add_argument('--scale_fan', action='store_true', help='')
     parser.add_argument('--dataset', type=str, default='cifar10', help='')
+    parser.add_argument('--train_weights_at_the_same_time', action='store_true', help='')
+
 
     # distributed training
     parser.add_argument("--local_rank", type=int, required=True, help='local rank for DistributedDataParallel')
