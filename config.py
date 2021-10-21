@@ -188,7 +188,7 @@ _C.bn_type = "LearnedBatchNorm"
 _C.first_layer_type = None
 _C.train_weights_at_the_same_time = False
 _C.use_running_stats = False
-_c.sample_from_training_set = False
+_C.sample_from_training_set = False
 def _update_config_from_file(config, cfg_file):
     with open(cfg_file, 'r') as f:
         yaml_cfg = yaml.load(f, Loader=yaml.FullLoader)
