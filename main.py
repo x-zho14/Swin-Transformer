@@ -119,8 +119,8 @@ def main(config):
 
     if config.finetune:
         print("continue finetune")
+        max_accuracy = 0
         config.K = 1
-        best_acc1 = 0
         config.finetuning = True
         freeze_model_subnet(model)
         fix_model_subnet(model)
