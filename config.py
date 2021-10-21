@@ -243,7 +243,7 @@ def update_config(config, args):
     if args.scale_fan:
         config.scale_fan = args.scale_fan
     if args.dataset:
-        config.data.dataset = args.dataset
+        config.DATA.DATASET = args.dataset
 
     # set local rank for distributed training
     config.LOCAL_RANK = args.local_rank
