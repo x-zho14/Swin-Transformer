@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torchvision
 import torch.nn as nn
-from args import args
+from config import config as args
 
 def print_model_param_nums(model=None):
     total = 0
