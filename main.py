@@ -26,9 +26,9 @@ from optimizer import build_optimizer
 from logger import create_logger
 from utils.storage import load_checkpoint, save_checkpoint, get_grad_norm, auto_resume_helper, reduce_tensor
 from config import config
-from utils.net_utils import constrainScoreByWhole
-from utils.
-
+from utils.net_utils import constrainScoreByWhole, freeze_model_subnet, freeze_model_weights
+from utils.compute_flops import print_model_param_flops_sparse
+import copy
 try:
     # noinspection PyUnresolvedReferences
     from apex import amp
@@ -95,9 +95,31 @@ def main(config):
     logger.info("Start training")
     start_time = time.time()
     flops_reduction_list = []
+    config.use_running_stats = False
     for epoch in range(config.TRAIN.START_EPOCH, config.TRAIN.EPOCHS):
         data_loader_train.sampler.set_epoch(epoch)
+        train_one_epoch(config, model, criterion, data_loader_train, weight_opt, score_opt, epoch, mixup_fn, lr_scheduler1, lr_scheduler2)
+        if dist.get_rank() == 0 and (epoch % config.SAVE_FREQ == 0 or epoch == (config.TRAIN.EPOCHS - 1)):
+            save_checkpoint(config, epoch, model_without_ddp, max_accuracy, weight_opt, score_opt, lr_scheduler1, lr_scheduler2, logger)
+        if epoch % 1 == 0 and "Dense" not in config.conv_type:
+            print("=> compute model params and flops")
+            c = 3
+            input_res = 224
+            flops_reduction = print_model_param_flops_sparse(model, c=c, input_res=input_res, multiply_adds=False)
+            flops_reduction_list.append(flops_reduction.item())
+            print("avg train cost/ savings", sum(flops_reduction_list)/len(flops_reduction_list), 3/(4*sum(flops_reduction_list)/len(flops_reduction_list)))
+            torch.cuda.empty_cache()
+        acc1, acc5, loss = validate(config, data_loader_val, model)
+        logger.info(f"Accuracy of the network on the {len(dataset_val)} test images: {acc1:.1f}%")
+        max_accuracy = max(max_accuracy, acc1)
+        logger.info(f'Max accuracy: {max_accuracy:.2f}%')
+    total_time = time.time() - start_time
+    total_time_str = str(datetime.timedelta(seconds=int(total_time)))
+    logger.info('Training time {}'.format(total_time_str))
 
+    config.use_running_stats = True
+    for epoch in range(0, 40):
+        data_loader_train.sampler.set_epoch(epoch)
         train_one_epoch(config, model, criterion, data_loader_train, weight_opt, score_opt, epoch, mixup_fn, lr_scheduler1, lr_scheduler2)
         if dist.get_rank() == 0 and (epoch % config.SAVE_FREQ == 0 or epoch == (config.TRAIN.EPOCHS - 1)):
             save_checkpoint(config, epoch, model_without_ddp, max_accuracy, weight_opt, score_opt, lr_scheduler1, lr_scheduler2, logger)
@@ -114,9 +136,45 @@ def main(config):
         max_accuracy = max(max_accuracy, acc1)
         logger.info(f'Max accuracy: {max_accuracy:.2f}%')
 
-    total_time = time.time() - start_time
-    total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-    logger.info('Training time {}'.format(total_time_str))
+    if config.finetune:
+        config.K = 1
+        print("continue finetune")
+        freeze_model_subnet(model)
+        fix_model_subnet(model)
+        finetune_optimizer = torch.optim.SGD(
+            filter(lambda p: p.requires_grad, model.parameters()),
+            lr=0.001,
+            momentum=config.solver.momentum,
+            weight_decay=config.solver.weight_decay,
+        )
+        if config.sample_from_training_set:
+            config.use_running_stats = False
+            i = 0
+            BESTACC1, BESTIDX = 0, 0
+            BESTSTATEDICT = None
+            BESTMODEL = copy.deepcopy(model)
+            while i < 10:
+                i += 1
+                acc1, acc5, loss = validate(config, data_loader_train, model)
+                print(acc1, BESTACC1, i)
+                if acc1 > BESTACC1:
+                    BESTACC1 = acc1
+                    BESTIDX = i
+                    BESTMODEL = copy.deepcopy(model)
+                print(BESTACC1, BESTIDX)
+                for n, m in model.named_modules():
+                    if hasattr(m, "scores") and m.prune:
+                        m.subnet = (torch.rand_like(m.scores) < m.clamped_scores).float()
+            model = copy.deepcopy(BESTMODEL)
+        config.use_running_stats = True
+        for epoch in range(0, 40):
+            data_loader_train.sampler.set_epoch(epoch)
+            train_one_epoch(config, model, criterion, data_loader_train, weight_opt, score_opt, epoch, mixup_fn,
+                            lr_scheduler1, lr_scheduler2)
+            acc1, acc5, loss = validate(config, data_loader_val, model)
+            logger.info(f"Accuracy of the network on the {len(dataset_val)} test images: {acc1:.1f}%")
+            max_accuracy = max(max_accuracy, acc1)
+            logger.info(f'Max accuracy: {max_accuracy:.2f}%')
 
 
 def master_params(optimizer1, optimizer2):
