@@ -202,7 +202,6 @@ def calculateGrad_pge(model, fn_list, args):
         if hasattr(m, "scores") and m.prune:
             m.scores.grad.data += 1/args.K*(fn_list[0]*getattr(m, 'stored_mask_0')) + 1/args.K*(fn_list[1]*getattr(m, 'stored_mask_1'))
 
-
 def train_one_epoch(config, model, criterion, data_loader, weight_opt, score_opt, epoch, mixup_fn, lr_scheduler1, lr_scheduler2):
     model.train()
     num_steps = len(data_loader)

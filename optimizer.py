@@ -33,13 +33,21 @@ def build_optimizer(config, model):
     opt_lower = config.TRAIN.OPTIMIZER.NAME.lower()
     optimizer, score_optimizer = None, None
     if opt_lower == 'sgd':
-        optimizer = optim.SGD(weight_params, momentum=config.TRAIN.OPTIMIZER.MOMENTUM, nesterov=True,
+        if config.train_weights_at_the_same_time:
+            optimizer = optim.SGD(weight_params, momentum=config.TRAIN.OPTIMIZER.MOMENTUM, nesterov=True,
                               lr=config.TRAIN.BASE_LR, weight_decay=config.TRAIN.WEIGHT_DECAY)
-        score_optimizer = optim.Adam(score_params, lr=12e-3, weight_decay=0)
+            score_optimizer = optim.Adam(score_params, lr=12e-3, weight_decay=0)
+        else:
+            optimizer = optim.SGD(weight_params, momentum=config.TRAIN.OPTIMIZER.MOMENTUM, nesterov=True,
+                                  lr=config.TRAIN.BASE_LR, weight_decay=config.TRAIN.WEIGHT_DECAY)
     elif opt_lower == 'adamw':
-        optimizer = optim.AdamW(weight_params, eps=config.TRAIN.OPTIMIZER.EPS, betas=config.TRAIN.OPTIMIZER.BETAS,
-                                lr=config.TRAIN.BASE_LR, weight_decay=config.TRAIN.WEIGHT_DECAY)
-        score_optimizer = optim.Adam(score_params, lr=12e-3, weight_decay=0)
+        if config.train_weights_at_the_same_time:
+            optimizer = optim.AdamW(weight_params, eps=config.TRAIN.OPTIMIZER.EPS, betas=config.TRAIN.OPTIMIZER.BETAS,
+                                    lr=config.TRAIN.BASE_LR, weight_decay=config.TRAIN.WEIGHT_DECAY)
+            score_optimizer = optim.Adam(score_params, lr=12e-3, weight_decay=0)
+        else:
+            optimizer = optim.AdamW(weight_params, eps=config.TRAIN.OPTIMIZER.EPS, betas=config.TRAIN.OPTIMIZER.BETAS,
+                                    lr=config.TRAIN.BASE_LR, weight_decay=config.TRAIN.WEIGHT_DECAY)
     return optimizer, score_optimizer, weight_params
 
 
